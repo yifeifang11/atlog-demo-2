@@ -6,8 +6,10 @@ import { usePathname } from "next/navigation";
 
 const flowLinks = [
   { label: "Invoice", href: "/flows/invoice" },
+  { label: "Checkout", href: "/flows/checkout" },
   { label: "Warranty Lookup", href: "/flows/warranty" },
   { label: "Contact Form", href: "/flows/contact-form" },
+  { label: "Chatbot", href: "/flows/chatbot" },
   { label: "Churn Survey", href: "/flows/churn-survey" },
   { label: "Account Creation", href: "/flows/account-creation" },
   { label: "Portal Settings", href: "/flows/portal-settings" },
