@@ -10,6 +10,7 @@ import {
   type ConsentEvent,
   type Customer,
 } from "../utils/consent";
+import EventDetailModal from "./components/EventDetailModal";
 
 interface EnrichedCustomer extends Customer {
   lastEvent?: ConsentEvent;
@@ -71,6 +72,8 @@ export default function DashboardPage() {
   const [lineTypeFilter, setLineTypeFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<ConsentEvent | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const loadSummary = useCallback(() => {
     setSummary(buildSummaryData());
@@ -91,6 +94,11 @@ export default function DashboardPage() {
       window.removeEventListener("storage", loadSummary);
     };
   }, [loadSummary]);
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedEvent(null);
+  }, []);
 
   const enrichedCustomers = useMemo<EnrichedCustomer[]>(() => {
     const eventMap = new Map(summary.events.map((event) => [event.id, event]));
@@ -141,6 +149,29 @@ export default function DashboardPage() {
     dateTo,
   ]);
 
+  const filteredEvents = useMemo(() => {
+    return summary.events.filter((eventItem) => {
+      if (channelFilter && eventItem.channel !== channelFilter) {
+        return false;
+      }
+      if (lineTypeFilter && eventItem.verificationResult !== lineTypeFilter) {
+        return false;
+      }
+      if (dateFrom && new Date(eventItem.timestamp) < new Date(dateFrom)) {
+        return false;
+      }
+      if (dateTo && new Date(eventItem.timestamp) > endOfDay(dateTo)) {
+        return false;
+      }
+      return true;
+    });
+  }, [summary.events, channelFilter, lineTypeFilter, dateFrom, dateTo]);
+
+  const handleEventRowClick = useCallback((eventItem: ConsentEvent) => {
+    setSelectedEvent(eventItem);
+    setIsModalOpen(true);
+  }, []);
+
   const channelOptions = useMemo(() => {
     const channels = new Set(summary.events.map((event) => event.channel));
     return ["", ...Array.from(channels)];
@@ -173,8 +204,9 @@ export default function DashboardPage() {
     window.localStorage.removeItem(CONSENT_EVENTS_KEY);
     window.localStorage.removeItem(CUSTOMERS_KEY);
     setSummary(EMPTY_SUMMARY);
+    handleCloseModal();
     loadSummary();
-  }, [loadSummary]);
+  }, [handleCloseModal, loadSummary]);
 
   return (
     <div className="space-y-8">
@@ -399,6 +431,80 @@ export default function DashboardPage() {
           </table>
         </div>
       </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Consent events
+        </h2>
+        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Event ID</th>
+                <th className="px-4 py-3">Customer ID</th>
+                <th className="px-4 py-3">Phone number</th>
+                <th className="px-4 py-3">Timestamp</th>
+                <th className="px-4 py-3">Channel</th>
+                <th className="px-4 py-3">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 text-slate-700">
+              {filteredEvents.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-6 text-center text-sm text-slate-500"
+                  >
+                    No consent events captured yet.
+                  </td>
+                </tr>
+              )}
+              {filteredEvents.map((eventItem) => (
+                <tr
+                  key={eventItem.id}
+                  tabIndex={0}
+                  onClick={() => handleEventRowClick(eventItem)}
+                  onKeyDown={(keyboardEvent) => {
+                    if (
+                      keyboardEvent.key === "Enter" ||
+                      keyboardEvent.key === " "
+                    ) {
+                      keyboardEvent.preventDefault();
+                      handleEventRowClick(eventItem);
+                    }
+                  }}
+                  className="cursor-pointer px-4 py-3 transition hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                    {eventItem.id}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {eventItem.customerId ?? "--"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {formatDisplayPhone(eventItem.phoneNumber)}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {new Date(eventItem.timestamp).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {eventItem.channel}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 capitalize">
+                    {eventItem.action}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <EventDetailModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        event={selectedEvent}
+      />
     </div>
   );
 }
